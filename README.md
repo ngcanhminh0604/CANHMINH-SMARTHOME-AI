@@ -1,117 +1,122 @@
 # CANH MINH SMARTHOME AI
 
-Hệ thống nhà thông minh dùng Raspberry Pi 4 kết hợp mô hình AI trên laptop để
-phát hiện lửa, khí gas và các trạng thái môi trường. Raspberry Pi điều khiển
-cửa servo, quạt, LED cảnh báo và LCD. Laptop xử lý đồng thời hai camera bằng
-model `FireVisionAI.pt` và phát âm thanh báo cháy liên tục.
+A Raspberry Pi 4 smart-home system combined with a laptop-based AI model for
+fire, gas, and environmental monitoring. The Raspberry Pi controls the door
+servo, fan, warning LED, and LCD. The laptop processes two cameras concurrently
+with `FireVisionAI.pt` and plays a continuous fire alarm.
 
-> Đây là mô hình thử nghiệm và học tập, không phải thiết bị báo cháy đã được
-> chứng nhận. Không dùng hệ thống này để thay thế thiết bị báo cháy chuyên dụng.
+> This is an educational prototype, not a certified life-safety system. Do not
+> use it as a replacement for certified smoke detectors or fire alarms.
 
-## Chức năng
+## Features
 
-- Theo dõi cảm biến lửa GPIO16.
-- Chạy AI nhận diện lửa đồng thời trên camera laptop và webcam USB.
-- Trao đổi trạng thái hai chiều giữa laptop và Raspberry Pi qua mạng LAN.
-- Phát âm thanh liên tục trên laptop khi AI hoặc cảm biến phát hiện lửa.
-- Tự động mở cửa, bật quạt và nhấp nháy LED khi có lửa.
-- Cảnh báo gas theo hai mức và tự động mở cửa/bật quạt.
-- Theo dõi nhiệt độ, độ ẩm và bật quạt khi vượt ngưỡng.
-- Đọc thẻ RFID để mở cửa trong thời gian đặt trước.
-- Hiển thị trạng thái ánh sáng khi chuyển giữa trời sáng và trời tối.
-- Tự động trở về `CANH MINH / SMARTHOME AI` sau thông báo thường.
-- Giữ cảnh báo lửa thêm 3 giây để tránh chập chờn giữa các frame.
+- Monitors a digital flame sensor on GPIO16.
+- Runs fire detection on the laptop camera and a USB webcam concurrently.
+- Exchanges fire status between the laptop and Raspberry Pi over the LAN.
+- Plays a continuous alarm on the laptop while either source reports fire.
+- Opens the door, starts the fan, and flashes the warning LED during a fire.
+- Supports warning and danger levels for the gas sensor.
+- Monitors temperature and humidity and starts the fan above configured limits.
+- Opens the door temporarily after an RFID card is detected.
+- Reports changes between bright and dark conditions on the LCD.
+- Returns the LCD to `CANH MINH / SMARTHOME AI` after normal notifications.
+- Holds fire alerts for three seconds to prevent flicker between AI frames.
 
-## Luồng hoạt động
+## System Architecture
 
 ```text
 Camera 0 + Camera 1
           |
           v
-Laptop chạy FireVisionAI.pt ---- phát âm thanh báo cháy
+Laptop runs FireVisionAI.pt ---- continuous fire alarm audio
           |
-          | HTTP LAN, cổng 8080
+          | HTTP over LAN, port 8080
           v
-Raspberry Pi 4 <---- cảm biến lửa, gas, AHTx0, RFID, ánh sáng
+Raspberry Pi 4 <---- flame, gas, AHTx0, RFID, and light sensors
           |
-          +---- servo cửa
-          +---- relay quạt
-          +---- LED cảnh báo
-          +---- LCD 16x2
+          +---- door servo
+          +---- fan relay
+          +---- warning LED
+          +---- 16x2 LCD
 ```
 
-Laptop và Pi dùng cùng một `CAMERA_TOKEN`. Pi gửi trạng thái cảm biến lửa sang
-laptop; laptop trả trạng thái của hai camera về Pi khoảng mỗi 0,15 giây. Nếu
-mất kết nối, cảm biến và cơ cấu trên Pi vẫn tiếp tục hoạt động độc lập.
+The laptop and Pi use the same `CAMERA_TOKEN`. The Pi sends its physical flame
+sensor state to the laptop, while the laptop returns the current state of both
+cameras approximately every 0.15 seconds. If the network connection is lost,
+the Raspberry Pi sensors and actuators continue operating locally.
 
-## Phần cứng
+## Hardware
 
-- Raspberry Pi 4, RAM 4 GB và thẻ nhớ 256 GB.
-- Laptop Windows, camera tích hợp và webcam USB.
-- Servo điều khiển cửa.
-- LCD I²C 16x2 dùng PCF8574.
-- Cảm biến lửa digital.
-- Cảm biến gas analog qua ADS1115.
-- Cảm biến nhiệt độ/độ ẩm AHTx0.
-- Đầu đọc RFID I²C.
-- Cảm biến ánh sáng digital.
-- Relay, quạt và LED cảnh báo đơn.
+- Raspberry Pi 4 with 4 GB RAM and a 256 GB microSD card.
+- Windows laptop with an integrated camera.
+- USB webcam.
+- Door servo.
+- 16x2 I²C LCD with a PCF8574 expander.
+- Digital flame sensor.
+- Analog gas sensor connected through an ADS1115.
+- AHTx0 temperature and humidity sensor.
+- I²C RFID reader.
+- Digital light sensor.
+- Fan, relay module, and warning LED.
 
-## Kết nối Raspberry Pi
+## Raspberry Pi Wiring
 
-Chương trình sử dụng cách đánh số chân **BCM**.
+The program uses **BCM GPIO numbering**.
 
-| Thiết bị | GPIO/địa chỉ | Chức năng |
+| Device | GPIO/address | Purpose |
 |---|---:|---|
-| Servo cửa | GPIO19 | Tín hiệu PWM 50 Hz |
-| Relay quạt | GPIO20 | HIGH bật, LOW tắt |
-| Cảm biến lửa | GPIO16 | LOW là phát hiện lửa |
-| LED cảnh báo | GPIO5 | Nhấp nháy khi có lửa |
-| Cảm biến ánh sáng | GPIO8 | LOW tối, HIGH sáng |
-| LCD PCF8574 | I²C `0x21` | LCD 16x2 |
-| ADS1115 | I²C `0x49` | Cảm biến gas ở kênh A0 |
-| RFID | I²C `0x2C` | Đọc UID thẻ |
-| AHTx0 | I²C mặc định | Nhiệt độ và độ ẩm |
-| SDA | GPIO2, chân vật lý 3 | Dữ liệu I²C |
-| SCL | GPIO3, chân vật lý 5 | Clock I²C |
+| Door servo | GPIO19 | 50 Hz PWM signal |
+| Fan relay | GPIO20 | HIGH is on, LOW is off |
+| Flame sensor | GPIO16 | LOW means fire detected |
+| Warning LED | GPIO5 | Flashes during a fire alert |
+| Light sensor | GPIO8 | LOW is dark, HIGH is bright |
+| PCF8574 LCD | I²C `0x21` | 16x2 status display |
+| ADS1115 | I²C `0x49` | Gas sensor on channel A0 |
+| RFID reader | I²C `0x2C` | Reads card UIDs |
+| AHTx0 | Default I²C address | Temperature and humidity |
+| SDA | GPIO2, physical pin 3 | I²C data |
+| SCL | GPIO3, physical pin 5 | I²C clock |
 
-Servo nên dùng nguồn 5 V riêng đủ dòng và nối chung GND với Raspberry Pi. Nguồn
-yếu hoặc không chung GND có thể làm servo rung, Pi khởi động lại hoặc I²C lỗi.
+Power the servo from a separate 5 V supply with sufficient current, and connect
+the supply ground to the Raspberry Pi ground. An undersized supply or missing
+common ground can cause servo jitter, Pi resets, and I²C communication errors.
 
-## Cấu hình mặc định
+## Default Configuration
 
-| Cấu hình | Giá trị |
+| Setting | Default |
 |---|---:|
-| Góc đóng cửa | `0°` |
-| Góc mở cửa | `175°` |
-| Thời gian mở bằng RFID | `5 giây` |
-| Gas cảnh báo | `2.0 V` |
-| Gas nguy hiểm | `2.5 V` |
-| Độ trễ gas | `0.10 V` |
-| Ngưỡng nhiệt độ | `30°C` |
-| Ngưỡng độ ẩm | `80%` |
-| Giữ cảnh báo cảm biến lửa | `3 giây` |
-| Cổng kết nối AI | `8080` |
+| Door closed angle | `0°` |
+| Door open angle | `175°` |
+| RFID door-open duration | `5 seconds` |
+| Gas warning threshold | `2.0 V` |
+| Gas danger threshold | `2.5 V` |
+| Gas hysteresis | `0.10 V` |
+| Temperature threshold | `30°C` |
+| Humidity threshold | `80%` |
+| Physical flame alert hold | `3 seconds` |
+| AI server port | `8080` |
 
-Hai ngưỡng gas cần được hiệu chỉnh theo cảm biến thực tế sau thời gian làm nóng.
-Không cấp vào ADS1115 điện áp vượt quá giới hạn phần cứng của ADC.
+Calibrate the gas thresholds for the actual sensor after it has warmed up. Do
+not apply a voltage to the ADS1115 that exceeds the ADC hardware limits.
 
-## Cấu trúc project
+## Project Structure
 
 ```text
 camerafire/
-├── main.py                    # Chạy trên Raspberry Pi
-├── laptop_fire_ai.py          # Chạy AI và âm thanh trên laptop
-├── FireVisionAI.pt            # Model nhận diện fire/smoke
-├── fire_alarm.mp3             # Âm thanh báo cháy lặp liên tục
-├── requirements-pi.txt        # Thư viện Raspberry Pi
-├── requirements-laptop.txt    # Thư viện laptop
+├── main.py                    # Runs on the Raspberry Pi
+├── laptop_fire_ai.py          # Runs AI and alarm audio on the laptop
+├── FireVisionAI.pt            # Fire/smoke detection model
+├── fire_alarm.mp3             # Continuously looping alarm audio
+├── requirements-pi.txt        # Raspberry Pi dependencies
+├── requirements-laptop.txt    # Laptop dependencies
 └── README.md
 ```
 
-Không đưa `.venv`, `__pycache__`, file `.env` hoặc token thật lên GitHub.
+Do not commit `.venv`, `__pycache__`, `.env`, or a real shared token to GitHub.
 
-## Cài đặt trên laptop Windows
+## Laptop Installation
+
+Open PowerShell:
 
 ```powershell
 cd D:\2026\camerafire
@@ -120,17 +125,17 @@ py -m venv .venv
 python -m pip install -r requirements-laptop.txt
 ```
 
-Kiểm tra model và tên lớp:
+Check that the model loads and inspect its class names:
 
 ```powershell
 python laptop_fire_ai.py --model FireVisionAI.pt --list-classes
 ```
 
-Model hiện tại có hai lớp `fire` và `smoke`.
+The current model contains the `fire` and `smoke` classes.
 
-## Cài đặt trên Raspberry Pi
+## Raspberry Pi Installation
 
-Bật I²C:
+Enable I²C and install the system packages:
 
 ```bash
 sudo raspi-config nonint do_i2c 0
@@ -139,7 +144,7 @@ sudo apt install -y i2c-tools python3-venv python3-pip
 sudo reboot
 ```
 
-Sau khi Pi khởi động lại:
+After the Pi restarts:
 
 ```bash
 cd /home/pi/Test
@@ -148,37 +153,38 @@ source .venv/bin/activate
 python -m pip install -r requirements-pi.txt
 ```
 
-Kiểm tra thiết bị I²C:
+Check the I²C devices:
 
 ```bash
 sudo i2cdetect -y 1
 ```
 
-Kết quả cần thấy các địa chỉ đang sử dụng như `21`, `2c`, `49` và địa chỉ của
-AHTx0. Nếu `/dev/i2c-1` không tồn tại, I²C chưa được bật hoặc Pi chưa khởi động
-lại sau khi thay đổi cấu hình.
+The output should include addresses such as `21`, `2c`, `49`, and the AHTx0
+address. If `/dev/i2c-1` does not exist, I²C has not been enabled or the Pi has
+not been restarted since changing the setting.
 
-## Chép chương trình Pi
+## Copying the Pi Program
 
-Từ PowerShell trên laptop:
+Run from PowerShell on the laptop:
 
 ```powershell
 scp "D:\2026\camerafire\main.py" pi@192.168.1.59:/home/pi/Test/main.py
 scp "D:\2026\camerafire\requirements-pi.txt" pi@192.168.1.59:/home/pi/Test/requirements-pi.txt
 ```
 
-## Chạy toàn bộ hệ thống
+## Running the Complete System
 
-### 1. Xác định IP laptop
+### 1. Find the laptop IP address
 
 ```powershell
 ipconfig
 ```
 
-Tìm `IPv4 Address` của Wi-Fi. Ví dụ hiện tại là `192.168.1.49`. IP có thể thay
-đổi khi kết nối lại Wi-Fi; nên đặt DHCP reservation nếu muốn giữ cố định.
+Find the Wi-Fi `IPv4 Address`. The current example is `192.168.1.49`. This
+address can change after reconnecting to Wi-Fi. Configure a DHCP reservation in
+the router if the laptop should always use the same address.
 
-### 2. Chạy AI trên laptop
+### 2. Start the AI application on the laptop
 
 ```powershell
 cd D:\2026\camerafire
@@ -195,12 +201,13 @@ $env:CAMERA_TOKEN="YOUR_SHARED_TOKEN"
   --alarm-volume 1.0
 ```
 
-Giữ cửa sổ này mở. Nhấn `Q` tại cửa sổ camera hoặc `Ctrl+C` để dừng. Nếu laptop
-có GPU NVIDIA và PyTorch nhận CUDA, có thể thay `--device cpu` bằng `--device 0`.
+Keep the PowerShell window open. Press `Q` in a camera window or `Ctrl+C` to
+stop. If the laptop has an NVIDIA GPU and PyTorch detects CUDA, replace
+`--device cpu` with `--device 0`.
 
-### 3. Chạy trên Raspberry Pi
+### 3. Start the Raspberry Pi application
 
-Token phải giống hệt token trên laptop:
+The token must exactly match the token used on the laptop:
 
 ```bash
 cd /home/pi/Test
@@ -212,22 +219,22 @@ python main.py \
   --ai-port 8080
 ```
 
-Khi kết nối thành công, Pi in:
+After a successful connection, the Pi prints:
 
 ```text
 [LAPTOP AI] Da ket noi
 ```
 
-## Kiểm tra kết nối mạng
+## Testing the Network Connection
 
-Từ Pi, thay token và IP cho đúng:
+Run from the Pi and replace the token and IP address as needed:
 
 ```bash
 curl -H "Authorization: Bearer YOUR_SHARED_TOKEN" \
   http://192.168.1.49:8080/status
 ```
 
-Phản hồi bình thường:
+A normal response looks like this:
 
 ```json
 {
@@ -239,128 +246,135 @@ Phản hồi bình thường:
 }
 ```
 
-Khi AI phát hiện lửa, camera tương ứng trả về `"state": "fire"`. Nếu Windows
-Firewall chặn kết nối, tạo Inbound Rule TCP cổng `8080`. Trên mạng Public nên
-giới hạn Remote IP là địa chỉ Pi, ví dụ `192.168.1.59`.
+When the AI detects fire, the corresponding camera returns `"state": "fire"`.
 
-## Thứ tự ưu tiên
+If Windows Firewall blocks the connection, create an inbound TCP rule for port
+`8080`. On a Public network, restrict the rule's remote IP to the Raspberry Pi,
+for example `192.168.1.59`.
 
-1. Lửa từ cảm biến hoặc camera AI.
-2. Gas nguy hiểm.
-3. Gas cảnh báo.
-4. Nhiệt độ hoặc độ ẩm cao.
-5. Thẻ RFID hợp lệ.
-6. Thay đổi nhiệt độ/độ ẩm.
-7. Thay đổi sáng/tối.
-8. Trạng thái bình thường.
+## State Priority
 
-Ở trạng thái bình thường LCD hiển thị:
+The LCD and actuator priority is:
+
+1. Fire reported by the physical sensor or camera AI.
+2. Dangerous gas level.
+3. Gas warning level.
+4. High temperature or humidity.
+5. RFID card detected.
+6. Temperature or humidity change.
+7. Light level change.
+8. Normal state.
+
+During normal operation, the LCD displays:
 
 ```text
 CANH MINH
 SMARTHOME AI
 ```
 
-## Hành vi cảnh báo lửa
+## Fire Alert Behavior
 
-Khi một trong hai nguồn báo lửa:
+When either fire source becomes active:
 
-- Cửa mở ngay đến `175°`.
-- Quạt bật.
-- LED GPIO5 nhấp nháy nhanh.
-- LCD hiển thị cảnh báo rời khỏi nhà.
-- Laptop phát `fire_alarm.mp3` và lặp liên tục.
+- The door opens immediately to `175°`.
+- The fan starts.
+- The LED on GPIO5 flashes rapidly.
+- The LCD shows an evacuation warning.
+- The laptop plays `fire_alarm.mp3` continuously.
 
-Âm thanh và trạng thái lửa dừng khi cả AI và cảm biến đều không còn báo lửa,
-sau thời gian giữ cảnh báo 3 giây. Cảnh báo gas hoặc môi trường vẫn có thể tiếp
-tục giữ quạt/cửa theo logic riêng.
+The alarm stops after both the AI and physical sensor no longer report fire and
+the three-second hold period has expired. Gas or environmental alerts can still
+keep the fan or door active according to their own rules.
 
-## Điều chỉnh AI
+## AI Tuning
 
-Giảm bỏ sót lửa:
+Reduce missed detections:
 
 ```powershell
 --conf 0.25
 ```
 
-Giảm cảnh báo nhầm:
+Reduce false detections:
 
 ```powershell
 --conf 0.35
 ```
 
-Giữ cảnh báo lâu hơn khi nhận diện chập chờn:
+Keep an unstable fire detection active for longer:
 
 ```powershell
 --fire-hold 5.0
 ```
 
-Nhận diện cả khói và lửa:
+Treat both smoke and fire as an emergency:
 
 ```powershell
 --fire-classes fire smoke
 ```
 
-Thay đổi âm lượng từ `0.0` đến `1.0`:
+Set the alarm volume from `0.0` to `1.0`:
 
 ```powershell
 --alarm-volume 0.7
 ```
 
-## Xử lý lỗi thường gặp
+## Troubleshooting
 
 ### `ModuleNotFoundError: No module named 'cv2'`
+
+The wrong Python interpreter is active, or the dependencies are missing:
 
 ```powershell
 cd D:\2026\camerafire
 .\.venv\Scripts\python.exe -m pip install -r requirements-laptop.txt
 ```
 
-### Pi không hiện `[LAPTOP AI] Da ket noi`
+### The Pi does not print `[LAPTOP AI] Da ket noi`
 
-- Kiểm tra AI laptop đang chạy.
-- Kiểm tra IP laptop bằng `ipconfig`.
-- Kiểm tra token hai máy giống nhau.
-- Kiểm tra cổng TCP 8080 trong Windows Firewall.
-- Chạy lệnh `curl` ở phần kiểm tra kết nối.
+- Confirm that the laptop AI program is running.
+- Check the current laptop IP with `ipconfig`.
+- Confirm that both machines use the same token.
+- Check TCP port 8080 in Windows Firewall.
+- Run the `curl` command from the network test section.
 
-### Camera hiển thị `unknown`
+### A camera reports `unknown`
 
-- Đóng ứng dụng khác đang sử dụng camera.
-- Thử đổi `--cameras 0 1` thành `--cameras 0 2`.
-- Kiểm tra webcam USB trong Camera hoặc Device Manager của Windows.
+- Close other applications using the camera.
+- Try `--cameras 0 2` instead of `--cameras 0 1`.
+- Check the USB webcam in Windows Camera or Device Manager.
 
-### AI nhận lửa lúc có lúc không
+### Fire detection is intermittent
 
-- Chạy với `--conf 0.25` hoặc `--conf 0.30`.
-- Tăng `--fire-hold` lên 5 giây.
-- Tăng ánh sáng và giảm khoảng cách đến vùng cần quan sát.
-- Kiểm tra dữ liệu huấn luyện có tương đồng với camera thực tế.
+- Use `--conf 0.25` or `--conf 0.30`.
+- Increase `--fire-hold` to five seconds.
+- Improve scene lighting and reduce the distance to the monitored area.
+- Check that the training data is representative of the real camera scene.
 
-### Servo rung hoặc chạy sai góc
+### The servo jitters or moves to the wrong angle
 
-- Kiểm tra nguồn servo và dây GND chung.
-- Không chạy nhiều chương trình cùng điều khiển GPIO19.
-- Kiểm tra `CLOSE_ANGLE = 0.0` và `OPEN_ANGLE = 175.0`.
-- Dừng chương trình nếu cơ cấu chạm giới hạn cơ khí.
+- Check the servo power supply and common ground.
+- Do not run multiple programs that control GPIO19.
+- Confirm `CLOSE_ANGLE = 0.0` and `OPEN_ANGLE = 175.0`.
+- Stop the program if the mechanism reaches a physical limit.
 
-### LCD nhấp nháy
+### The LCD flickers
 
-`main.py` chỉ ghi LCD khi nội dung thay đổi. Không chạy đồng thời các file thử
-LCD cũ vì chúng có thể gọi `lcd.clear()` liên tục và tranh chấp I²C.
+`main.py` only writes when the displayed content changes. Do not run old LCD
+test programs at the same time because they may repeatedly call `lcd.clear()`
+and compete for the I²C bus.
 
-### RFID không đọc được UID
+### The RFID reader does not return a UID
 
-- Kiểm tra địa chỉ `0x2C` bằng `i2cdetect`.
-- Kiểm tra dây SDA, SCL, nguồn và GND.
-- Nếu RFID không khởi tạo được, phần còn lại của hệ thống vẫn tiếp tục chạy.
+- Check address `0x2C` with `i2cdetect`.
+- Check SDA, SCL, power, and ground wiring.
+- If RFID initialization fails, the rest of the system continues running.
 
-## Âm thanh cảnh báo
+## Alarm Audio Attribution
 
-`fire_alarm.mp3` là bản chuyển mã của **NFPA Fire Alarm**, tác giả Awesome
-Aasim. Tệp được công bố thuộc phạm vi công cộng trên Wikimedia Commons:
+`fire_alarm.mp3` is a transcoded version of **NFPA Fire Alarm** by Awesome
+Aasim. The file is identified as public domain on Wikimedia Commons:
 
 <https://commons.wikimedia.org/wiki/File:NFPA_Fire_Alarm.ogg>
 
-Chương trình dùng Windows MCI (`winmm`) để phát MP3 lặp liên tục, không cần cài
-`pygame` hoặc trình phát âm thanh ngoài.
+The laptop program uses Windows MCI (`winmm`) to loop the MP3 continuously, so
+it does not require `pygame` or an external media player.
